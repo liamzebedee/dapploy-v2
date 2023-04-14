@@ -217,6 +217,7 @@ export default function ViewENS() {
     // 2. Advanced mode.
 
     const [mode, setMode] = useState('simple')
+    const [isEditing, setIsEditing] = useState(false)
 
     let tabActiveClass = 'bg-white inline-flex items-center px-1 pt-1 border-b-2 border-indigo-500 text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-indigo-700 transition duration-150 ease-in-out'
     let tabInactiveClass = 'bg-white inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium leading-5 text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out'
@@ -253,26 +254,15 @@ export default function ViewENS() {
                         <p>This name resolves to content on {toHumanisedList(data.resolutionMethods)}
                         </p>
                         <br/>
-                        <div className="flex flex-col pd-5">
-                            <div className="flex flex-col">
-                                <label htmlFor="torrent" className="block text-sm font-medium leading-5 text-gray-700">
-                                    BitTorrent magnet link
-                                </label>
-                                <div className="mt-1 relative rounded-md shadow-sm">
-                                    <input id="torrent" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="magnet:?xt=urn:btih:..." value={data.torrent} />
-                                </div>
-                            </div>
-                            
-                            <div className="flex flex-col">
-                                <label htmlFor="torrent" className="block text-sm font-medium leading-5 text-gray-700">
-                                {data.contenthash.codecHumanized}
-                                </label>
-                                <div className="mt-1 relative rounded-md shadow-sm">
-                                    <input id="torrent" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="" value={data.contenthash.hash!} />
-                                </div>
-                            </div>
-                        </div>
+
+                        {
+                            isEditing 
+                            ? <SimpleEditTable data={data} saveChanges={() => setIsEditing(false)} discardChanges={() => setIsEditing(false)} />
+                            : <SimpleViewTable data={data} beginEdit={() => setIsEditing(true)}/>
+                        }
+                        
                     </div>
+
                 }
                 
 
@@ -294,3 +284,141 @@ export default function ViewENS() {
     )
 }
 
+const SimpleEditTable = ({ data, saveChanges, discardChanges }: any) => {
+    const [torrent, setTorrent] = useState(data.torrent)
+    const [contenthash, setContenthash] = useState(data.contenthash)
+
+    const [contentHashSelector, setContentHashSelector] = useState(() => {
+        if(data.contenthash.codec == 'ipfs-ns') {
+            return 'ipfs-ns'
+        }
+        if(data.contenthash.codec == 'ipns-ns') {
+            return 'ipns-ns'
+        }
+        return ''
+    })
+
+    let actions = []
+    if(torrent != data.torrent) {
+        actions.push({ type: 'torrent', value: torrent })
+    }
+    if (contenthash.hash != data.contenthash.hash) {
+        actions.push({ type: 'contenthash', value: contenthash })
+    }
+
+    const dirtyState = actions.length > 0
+    console.log(actions)
+
+    const selectContentHashCodec = (codec: string) => {
+        // If we change from IPFS->IPNS, reset the field.
+        if(codec != contenthash.codec) {
+            setContenthash('')
+        } 
+        // However, if we swap back, and the field hasn't changed yet, reset it.
+        // if(contenthash == '' && codec == data.contenthash.codec) {
+        //     setContenthash(data.contenthash)
+        // }
+
+        setContentHashSelector(codec)
+    }
+
+    const updateContenthash = (codec: 'ipns-ns' | 'ipfs-ns', newContenthash: any) => {
+        setContenthash({
+            codec,
+            hash: newContenthash,
+        })
+    }
+
+    return <div className="flex flex-col pd-5">
+        <div className="flex flex-col">
+            <label htmlFor="torrent" className="block text-sm font-medium leading-5 text-gray-700">
+                BitTorrent magnet link
+            </label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+                <input id="torrent" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="magnet:?xt=urn:btih:..." value={torrent} onChange={(e) => setTorrent(e.target.value)} />
+            </div>
+        </div>
+
+        <div className="flex flex-col">
+            <label htmlFor="ipns-key" className="block text-sm font-medium leading-5 text-gray-700">
+                IPFS
+            </label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+                {/* Dropdown select IPFS or IPNS */}
+                
+                <div onClick={() => selectContentHashCodec('ipfs-ns')}>
+                    <input type="radio" id="radio-ipfs" name="radio-ipfs" value="ipfs-ns" checked={contentHashSelector == 'ipfs-ns'}/>
+                    <label htmlFor="radio-ipfs">IPFS hash</label><br/>
+                </div>
+                
+                <div onClick={() => selectContentHashCodec('ipns-ns')}>
+                    <input type="radio" id="css" name="radio-ipns" value="ipns-ns" checked={contentHashSelector == 'ipns-ns'} />
+                    <label htmlFor="radio-ipns">IPNS name</label><br/>
+                </div>
+
+                {
+                    contentHashSelector == 'ipns-ns' && <>
+                        {/* <label htmlFor="ipfs-hash" className="block text-sm font-medium leading-5 text-gray-700">
+                            IPNS name
+                        </label> */}
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                            <input id="contenthash" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="12D3KooWJmQBthDhuuHG8TTZUssFba8rTPFFYVvTqqdSaJgRhmi7" value={contenthash.hash} onChange={(e) => updateContenthash('ipns-ns', e.target.value)} />
+                        </div>
+                    </>
+                }
+
+                {
+                    contentHashSelector == 'ipfs-ns' && <>
+                        {/* <label htmlFor="ipfs-hash" className="block text-sm font-medium leading-5 text-gray-700">
+                            IPFS hash
+                        </label> */}
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                            <input id="ipfs-hash" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="QmPCRt8v4iLrE8mgtPvYrDKj28jyoZMWdnGzXgQCBk59EV" value={contenthash.hash} onChange={(e) => updateContenthash('ipfs-ns', e.target.value)} />
+                        </div>
+                    </>
+                }
+            </div>
+        </div>
+
+        <div className="mt-4">
+            <button disabled={!dirtyState} onClick={() => saveChanges(false)} className={"bg-indigo-500 text-white font-bold py-2 px-4 rounded " + (!dirtyState && "bg-opacity-50")}>
+                Save
+            </button>
+            <button onClick={() => discardChanges(false)} className="bg-gray-500 hover:bg-indigo-400 text-white font-bold py-2 px-4 rounded">
+                Discard changes
+            </button>
+        </div>
+    </div>
+}
+
+const SimpleViewTable = ({ data, beginEdit }: any) => {
+    return <div className="flex flex-col pd-5">
+        <div className="flex flex-col">
+            <label htmlFor="torrent" className="block text-sm font-medium leading-5 text-gray-700">
+                BitTorrent magnet link
+            </label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+                <InputRO id="torrent" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="magnet:?xt=urn:btih:..." value={data.torrent} />
+            </div>
+        </div>
+
+        <div className="flex flex-col">
+            <label htmlFor="torrent" className="block text-sm font-medium leading-5 text-gray-700">
+                {data.contenthash.codecHumanized}
+            </label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+                <InputRO id="torrent" className="form-input block w-full sm:text-sm sm:leading-5" placeholder="" value={data.contenthash.hash!} />
+            </div>
+        </div>
+
+        <div className="mt-4">
+            <button onClick={() => beginEdit()} className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-2 px-4 rounded">
+                Edit
+            </button>
+        </div>
+    </div>
+}
+
+const InputRO = (props: any) => {
+    return <div {...props} readOnly>{props.value}</div>
+}
